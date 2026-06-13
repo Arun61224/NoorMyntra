@@ -389,11 +389,22 @@ def run_bulk_processing(df, mode, target_margin=0.0):
                 )
                 
                 output_data.update({
-                    "Selling_Price": selling_price,
-                    "Bank_Settlement_Amount": settled_amount,
-                    "Royalty_You_Pay": royalty_fee,
-                    "Marketing_Fee_You_Pay": marketing_fee_base + marketing_fee_gst,
-                    "Net_Profit_In_Hand": net_profit
+                    "Selling_Price": round(selling_price, 2),
+                    "Taxable_Amount": round(taxable_amount_value, 2),
+                    "Commission_(Inc_GST)": round(final_commission, 2),
+                    "Fixed_Fee_(Inc_GST)": round(gt_charge, 2),
+                    "YK_Fixed_Fee_(Inc_GST)": round(yk_fixed_fee, 2),
+                    "Total_Platform_Deductions": round(final_commission + gt_charge + yk_fixed_fee, 2),
+                    "TDS": round(tds, 2),
+                    "TCS": round(tcs, 2),
+                    "Bank_Settlement_Amount": round(settled_amount, 2),
+                    "Royalty_You_Pay": round(royalty_fee, 2),
+                    "Marketing_Fee_Base": round(marketing_fee_base, 2),
+                    "Marketing_Fee_GST": round(marketing_fee_gst, 2),
+                    "Marketing_Total_You_Pay": round(marketing_fee_base + marketing_fee_gst, 2),
+                    "Return_Charges": round(yk_ret_chg, 2),
+                    "Return_Cost_Loss": round(yk_ret_cost, 2),
+                    "Net_Profit_In_Hand": round(net_profit, 2)
                 })
 
             else: 
@@ -403,9 +414,21 @@ def run_bulk_processing(df, mode, target_margin=0.0):
                     yk_ret_chg, yk_ret_cost
                 )
                 
-                selling_price_req = (mrp - discount_amount) if discount_amount is not None else "N/A"
+                selling_price_req = round(mrp - discount_amount, 2) if discount_amount is not None else "N/A"
+                
+                taxable_amt = "N/A"
+                comm_inc_gst = "N/A"
+                fixed_inc_gst = "N/A"
+                yk_fixed_inc_gst = "N/A"
+                total_plat_deduct = "N/A"
+                tds_val = "N/A"
+                tcs_val = "N/A"
                 bank_settlement_amt = "N/A"
+                royalty_val = "N/A"
+                mkt_base = "N/A"
+                mkt_gst = "N/A"
                 marketing_total_pay = "N/A"
+                net_profit_val = "N/A"
 
                 if discount_amount is not None:
                     (sale_price, gt_charge, customer_paid_amount, royalty_fee,
@@ -417,15 +440,38 @@ def run_bulk_processing(df, mode, target_margin=0.0):
                         myntra_brand, myntra_cat, myntra_gen, apply_kuchipoo_royalty,
                         yk_ret_chg, yk_ret_cost
                     )
-                    bank_settlement_amt = settled_amount
-                    marketing_total_pay = marketing_fee_base + marketing_fee_gst
+                    taxable_amt = round(taxable_amount_value, 2)
+                    comm_inc_gst = round(final_commission, 2)
+                    fixed_inc_gst = round(gt_charge, 2)
+                    yk_fixed_inc_gst = round(yk_fixed_fee, 2)
+                    total_plat_deduct = round(final_commission + gt_charge + yk_fixed_fee, 2)
+                    tds_val = round(tds, 2)
+                    tcs_val = round(tcs, 2)
+                    bank_settlement_amt = round(settled_amount, 2)
+                    royalty_val = round(royalty_fee, 2)
+                    mkt_base = round(marketing_fee_base, 2)
+                    mkt_gst = round(marketing_fee_gst, 2)
+                    marketing_total_pay = round(marketing_fee_base + marketing_fee_gst, 2)
+                    net_profit_val = round(final_profit, 2)
 
                 output_data.update({
-                    "Target_Margin": target_margin,
+                    "Target_Margin": round(target_margin, 2) if isinstance(target_margin, (int, float)) else target_margin,
                     "Required_Selling_Price": selling_price_req,
+                    "Taxable_Amount": taxable_amt,
+                    "Commission_(Inc_GST)": comm_inc_gst,
+                    "Fixed_Fee_(Inc_GST)": fixed_inc_gst,
+                    "YK_Fixed_Fee_(Inc_GST)": yk_fixed_inc_gst,
+                    "Total_Platform_Deductions": total_plat_deduct,
+                    "TDS": tds_val,
+                    "TCS": tcs_val,
                     "Bank_Settlement_Amount": bank_settlement_amt,
-                    "Marketing_Fee_You_Pay": marketing_total_pay,
-                    "Projected_Net_Profit": final_profit if final_profit is not None else "N/A"
+                    "Royalty_You_Pay": royalty_val,
+                    "Marketing_Fee_Base": mkt_base,
+                    "Marketing_Fee_GST": mkt_gst,
+                    "Marketing_Total_You_Pay": marketing_total_pay,
+                    "Return_Charges": round(yk_ret_chg, 2),
+                    "Return_Cost_Loss": round(yk_ret_cost, 2),
+                    "Projected_Net_Profit": net_profit_val
                 })
 
             output_rows.append(output_data)
