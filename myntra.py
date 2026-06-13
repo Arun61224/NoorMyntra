@@ -5,10 +5,6 @@ from io import BytesIO
 FULL_TITLE = "Myntra E-commerce Calculator"
 st.set_page_config(layout="wide", page_title=FULL_TITLE, page_icon="🛍️")
 
-# --- Password State ---
-if 'password_correct' not in st.session_state:
-    st.session_state.password_correct = False
-
 st.markdown("""
 <style>
     .block-container {
@@ -499,177 +495,169 @@ with st.expander("Show Templates"):
 st.divider()
 
 if main_mode == "Single Product Calculation":
-    
-    if st.session_state.password_correct: 
 
-        st.markdown("###### **3. Select Calculation Mode**")
-        single_calc_mode = st.radio(
-            "Select Calculation Mode:", 
-            ('Check With Selling Price', 'Check With Cost Price'),
-            index=0, label_visibility="collapsed", horizontal=True
-        )
-        st.markdown("---")
+    st.markdown("###### **3. Select Calculation Mode**")
+    single_calc_mode = st.radio(
+        "Select Calculation Mode:", 
+        ('Check With Selling Price', 'Check With Cost Price'),
+        index=0, label_visibility="collapsed", horizontal=True
+    )
+    st.markdown("---")
 
-        def lookup_sku():
-            sku = st.session_state.get('sku_select_key', '').strip() 
-            if not sku or sku == "Select SKU...": return
-
-            if 'sku_df' in st.session_state:
-                sku_df = st.session_state.sku_df
-                cols = sku_df.columns
-                sku_col_name = 'seller_sku_code' if 'seller_sku_code' in cols else 'sku_code'
-                mrp_col_name = 'product_mrp' if 'product_mrp' in cols else 'mrp'
-                cost_col_name = 'product_cost' if 'product_cost' in cols else 'cost_price'
-                
-                result = sku_df[sku_df[sku_col_name].astype(str).str.lower() == sku.lower()]
-                
-                if not result.empty:
-                    row = result.iloc[0]
-                    try: st.session_state.new_mrp = float(row[mrp_col_name])
-                    except: pass
-                    try: st.session_state.single_cost = float(row[cost_col_name])
-                    except: pass
-
-                    brand_col = 'myntra_brand' if 'myntra_brand' in cols else 'brand' 
-                    cat_col = 'myntra_article_type' if 'myntra_article_type' in cols else 'article_type'
-                    gen_col = 'myntra_gender' if 'myntra_gender' in cols else 'gender'
-                    if brand_col in row: st.session_state.myntra_brand_v3 = row[brand_col]
-                    if cat_col in row: st.session_state.myntra_cat_v3 = row[cat_col]
-                    if gen_col in row: st.session_state.myntra_gen_v3 = row[gen_col]
+    def lookup_sku():
+        sku = st.session_state.get('sku_select_key', '').strip() 
+        if not sku or sku == "Select SKU...": return
 
         if 'sku_df' in st.session_state:
-            sku_df = st.session_state.sku_df 
+            sku_df = st.session_state.sku_df
             cols = sku_df.columns
             sku_col_name = 'seller_sku_code' if 'seller_sku_code' in cols else 'sku_code'
+            mrp_col_name = 'product_mrp' if 'product_mrp' in cols else 'mrp'
+            cost_col_name = 'product_cost' if 'product_cost' in cols else 'cost_price'
             
-            if sku_col_name:
-                sku_options = ["Select SKU..."] + sorted(st.session_state.sku_df[sku_col_name].dropna().unique().tolist())
-                st.selectbox("**Fetch by SKU:**", options=sku_options, key="sku_select_key", on_change=lookup_sku)
-
-        st.markdown("###### **4. Configuration Settings**")
-
-        yk_return_charges = 0.0
-        yk_return_product_cost = 0.0
-
-        col_brand, col_cat, col_gen = st.columns(3)
-        brand_options = list(MYNTRA_COMMISSION_DATA.keys())
-        myntra_new_brand = col_brand.selectbox("Select Brand:", brand_options, key="myntra_brand_v3")
-        
-        try:
-            category_options = list(MYNTRA_COMMISSION_DATA[myntra_new_brand].keys())
-            myntra_new_category = col_cat.selectbox("Select Category:", category_options, key="myntra_cat_v3")
-        except KeyError:
-            category_options = []
-            myntra_new_category = col_cat.selectbox("Select Category:", category_options, index=0, key="myntra_cat_v3")
-        
-        try:
-            gender_options = list(MYNTRA_COMMISSION_DATA[myntra_new_brand][myntra_new_category].keys())
-            myntra_new_gender = col_gen.selectbox("Select Gender:", gender_options, key="myntra_gen_v3")
-        except KeyError:
-                gender_options = []
-                myntra_new_gender = col_gen.selectbox("Select Gender:", gender_options, index=0, key="myntra_gen_v3")
-                
-        if myntra_new_brand in ["YK", "YK Disney", "YK Marvel"]:
-            st.markdown("**YK Brands Return Deductions (Optional)**")
-            col_ret1, col_ret2 = st.columns(2)
-            yk_return_charges = col_ret1.number_input("Average Return Logistics Charge (₹)", value=0.0, min_value=0.0)
-            yk_return_product_cost = col_ret2.number_input("Average Return Product Loss (₹)", value=0.0, min_value=0.0)
-
-        col_cost, col_target = st.columns(2)
-        product_cost = col_cost.number_input("Product Cost (₹)", min_value=0.0, value=1000.0, key="single_cost")
-        
-        product_margin_target_rs = col_target.number_input("Target Net Profit (₹)", min_value=0.0, value=200.0, key="single_target", help="Net Profit you want in hand AFTER paying Royalty")
-        
-        st.divider()
-
-        col_mrp_in, col_price_in = st.columns(2)
-        new_mrp = col_mrp_in.number_input("Product MRP (₹)", min_value=1.0, value=2500.0, key="new_mrp")
-
-        new_discount = 0.0
-
-        if single_calc_mode == 'Check With Selling Price':
-            new_discount = col_price_in.number_input("Discount Amount (₹)", value=500.0)
-
-        st.divider()
-
-        if new_mrp > 0 and product_cost > 0:
+            result = sku_df[sku_df[sku_col_name].astype(str).str.lower() == sku.lower()]
             
-            apply_kuchipoo_royalty = 'No' 
+            if not result.empty:
+                row = result.iloc[0]
+                try: st.session_state.new_mrp = float(row[mrp_col_name])
+                except: pass
+                try: st.session_state.single_cost = float(row[cost_col_name])
+                except: pass
+
+                brand_col = 'myntra_brand' if 'myntra_brand' in cols else 'brand' 
+                cat_col = 'myntra_article_type' if 'myntra_article_type' in cols else 'article_type'
+                gen_col = 'myntra_gender' if 'myntra_gender' in cols else 'gender'
+                if brand_col in row: st.session_state.myntra_brand_v3 = row[brand_col]
+                if cat_col in row: st.session_state.myntra_cat_v3 = row[cat_col]
+                if gen_col in row: st.session_state.myntra_gen_v3 = row[gen_col]
+
+    if 'sku_df' in st.session_state:
+        sku_df = st.session_state.sku_df 
+        cols = sku_df.columns
+        sku_col_name = 'seller_sku_code' if 'seller_sku_code' in cols else 'sku_code'
+        
+        if sku_col_name:
+            sku_options = ["Select SKU..."] + sorted(st.session_state.sku_df[sku_col_name].dropna().unique().tolist())
+            st.selectbox("**Fetch by SKU:**", options=sku_options, key="sku_select_key", on_change=lookup_sku)
+
+    st.markdown("###### **4. Configuration Settings**")
+
+    yk_return_charges = 0.0
+    yk_return_product_cost = 0.0
+
+    col_brand, col_cat, col_gen = st.columns(3)
+    brand_options = list(MYNTRA_COMMISSION_DATA.keys())
+    myntra_new_brand = col_brand.selectbox("Select Brand:", brand_options, key="myntra_brand_v3")
+    
+    try:
+        category_options = list(MYNTRA_COMMISSION_DATA[myntra_new_brand].keys())
+        myntra_new_category = col_cat.selectbox("Select Category:", category_options, key="myntra_cat_v3")
+    except KeyError:
+        category_options = []
+        myntra_new_category = col_cat.selectbox("Select Category:", category_options, index=0, key="myntra_cat_v3")
+    
+    try:
+        gender_options = list(MYNTRA_COMMISSION_DATA[myntra_new_brand][myntra_new_category].keys())
+        myntra_new_gender = col_gen.selectbox("Select Gender:", gender_options, key="myntra_gen_v3")
+    except KeyError:
+            gender_options = []
+            myntra_new_gender = col_gen.selectbox("Select Gender:", gender_options, index=0, key="myntra_gen_v3")
             
-            if 'sku_df' in st.session_state:
-                selected_sku = st.session_state.get('sku_select_key', '').strip()
-                is_myntra_royalty_sku = selected_sku and (selected_sku.startswith("DKUC") or selected_sku.startswith("MKUC"))
-                if myntra_new_brand == 'KUCHIPOO' and is_myntra_royalty_sku:
-                    apply_kuchipoo_royalty = 'Yes'
-                    st.success(f"Royalty Active: 10% (SKU: {selected_sku})")
+    if myntra_new_brand in ["YK", "YK Disney", "YK Marvel"]:
+        st.markdown("**YK Brands Return Deductions (Optional)**")
+        col_ret1, col_ret2 = st.columns(2)
+        yk_return_charges = col_ret1.number_input("Average Return Logistics Charge (₹)", value=0.0, min_value=0.0)
+        yk_return_product_cost = col_ret2.number_input("Average Return Product Loss (₹)", value=0.0, min_value=0.0)
 
-            # --- PERFORM CALCULATION ---
-            if single_calc_mode == 'Check With Cost Price':
-                calculated_discount, initial_max_profit, calculated_discount_percent = find_discount_for_target_profit(
-                    new_mrp, product_margin_target_rs, product_cost,
-                    myntra_new_brand, myntra_new_category, myntra_new_gender, apply_kuchipoo_royalty, 
-                    yk_return_charges, yk_return_product_cost
-                )
+    col_cost, col_target = st.columns(2)
+    product_cost = col_cost.number_input("Product Cost (₹)", min_value=0.0, value=1000.0, key="single_cost")
+    
+    product_margin_target_rs = col_target.number_input("Target Net Profit (₹)", min_value=0.0, value=200.0, key="single_target", help="Net Profit you want in hand AFTER paying Royalty")
+    
+    st.divider()
+
+    col_mrp_in, col_price_in = st.columns(2)
+    new_mrp = col_mrp_in.number_input("Product MRP (₹)", min_value=1.0, value=2500.0, key="new_mrp")
+
+    new_discount = 0.0
+
+    if single_calc_mode == 'Check With Selling Price':
+        new_discount = col_price_in.number_input("Discount Amount (₹)", value=500.0)
+
+    st.divider()
+
+    if new_mrp > 0 and product_cost > 0:
+        
+        apply_kuchipoo_royalty = 'No' 
+        
+        if 'sku_df' in st.session_state:
+            selected_sku = st.session_state.get('sku_select_key', '').strip()
+            is_myntra_royalty_sku = selected_sku and (selected_sku.startswith("DKUC") or selected_sku.startswith("MKUC"))
+            if myntra_new_brand == 'KUCHIPOO' and is_myntra_royalty_sku:
+                apply_kuchipoo_royalty = 'Yes'
+                st.success(f"Royalty Active: 10% (SKU: {selected_sku})")
+
+        # --- PERFORM CALCULATION ---
+        if single_calc_mode == 'Check With Cost Price':
+            calculated_discount, initial_max_profit, calculated_discount_percent = find_discount_for_target_profit(
+                new_mrp, product_margin_target_rs, product_cost,
+                myntra_new_brand, myntra_new_category, myntra_new_gender, apply_kuchipoo_royalty, 
+                yk_return_charges, yk_return_product_cost
+            )
+            
+            if calculated_discount is None:
+                st.error(f"Cannot achieve Target Profit. Max possible profit at MRP is ₹ {initial_max_profit:,.2f}.")
+                st.stop()
                 
-                if calculated_discount is None:
-                    st.error(f"Cannot achieve Target Profit. Max possible profit at MRP is ₹ {initial_max_profit:,.2f}.")
-                    st.stop()
-                    
-                new_discount = calculated_discount
+            new_discount = calculated_discount
 
-            (sale_price, gt_charge, customer_paid_amount, royalty_fee,
-             marketing_fee_base, marketing_fee_gst, final_commission,
-             commission_rate, settled_amount, taxable_amount_value,
-             net_profit, tds, tcs, invoice_tax_rate, yk_fixed_fee 
-             ) = perform_calculations(
-                 new_mrp, new_discount, product_cost, 
-                 myntra_new_brand, myntra_new_category, myntra_new_gender, apply_kuchipoo_royalty, 
-                 yk_return_charges, yk_return_product_cost 
-             )
+        (sale_price, gt_charge, customer_paid_amount, royalty_fee,
+         marketing_fee_base, marketing_fee_gst, final_commission,
+         commission_rate, settled_amount, taxable_amount_value,
+         net_profit, tds, tcs, invoice_tax_rate, yk_fixed_fee 
+         ) = perform_calculations(
+             new_mrp, new_discount, product_cost, 
+             myntra_new_brand, myntra_new_category, myntra_new_gender, apply_kuchipoo_royalty, 
+             yk_return_charges, yk_return_product_cost 
+         )
 
-            col_left, col_right = st.columns(2)
+        col_left, col_right = st.columns(2)
 
-            with col_left:
-                st.markdown("### 1. Invoice & Sales")
-                st.metric("Selling Price", f"₹ {sale_price:,.2f}")
-                st.metric("Discount", f"₹ {new_discount:,.2f}")
-                
-                st.markdown("### 2. Platform Deductions")
-                c1, c2 = st.columns(2)
-                c1.metric("Commission (+GST)", f"₹ {final_commission:,.2f}")
-                c2.metric("Fixed/Logistics (+GST)", f"₹ {gt_charge + yk_fixed_fee:,.2f}")
+        with col_left:
+            st.markdown("### 1. Invoice & Sales")
+            st.metric("Selling Price", f"₹ {sale_price:,.2f}")
+            st.metric("Discount", f"₹ {new_discount:,.2f}")
+            
+            st.markdown("### 2. Platform Deductions")
+            c1, c2 = st.columns(2)
+            c1.metric("Commission (+GST)", f"₹ {final_commission:,.2f}")
+            c2.metric("Fixed/Logistics (+GST)", f"₹ {gt_charge + yk_fixed_fee:,.2f}")
 
-                total_deductions_display = final_commission + gt_charge + yk_fixed_fee 
-                st.info(f"Total Platform Deductions: ₹ {total_deductions_display:,.2f}")
+            total_deductions_display = final_commission + gt_charge + yk_fixed_fee 
+            st.info(f"Total Platform Deductions: ₹ {total_deductions_display:,.2f}")
 
-            with col_right:
-                st.markdown("### 3. Settlement & Profit")
-                
-                st.metric("🏦 Bank Settlement", f"₹ {settled_amount:,.2f}")
-                
-                st.markdown("---")
-                st.write("**Your Expenses after Settlement:**")
-                ex1, ex2 = st.columns(2)
-                ex1.metric("Product Cost", f"₹ {product_cost:,.2f}")
-                ex2.metric("Royalty (You Pay)", f"₹ {royalty_fee:,.2f}", delta="Pay Externally", delta_color="inverse")
-                
-                ex3, ex4 = st.columns(2)
-                ex3.metric("Marketing (You Pay)", f"₹ {marketing_fee_base:,.2f}", delta="Pay Externally", delta_color="inverse")
-                ex4.metric("Mrkt GST (18%)", f"₹ {marketing_fee_gst:,.2f}", delta="Pay Externally", delta_color="inverse")
-                
-                if myntra_new_brand in ["YK", "YK Disney", "YK Marvel"] and (yk_return_charges > 0 or yk_return_product_cost > 0):
-                    ex5, ex6 = st.columns(2)
-                    ex5.metric("Return Logistics", f"₹ {yk_return_charges:,.2f}", delta="Deducted", delta_color="inverse")
-                    ex6.metric("Return Product Loss", f"₹ {yk_return_product_cost:,.2f}", delta="Deducted", delta_color="inverse")
+        with col_right:
+            st.markdown("### 3. Settlement & Profit")
+            
+            st.metric("🏦 Bank Settlement", f"₹ {settled_amount:,.2f}")
+            
+            st.markdown("---")
+            st.write("**Your Expenses after Settlement:**")
+            ex1, ex2 = st.columns(2)
+            ex1.metric("Product Cost", f"₹ {product_cost:,.2f}")
+            ex2.metric("Royalty (You Pay)", f"₹ {royalty_fee:,.2f}", delta="Pay Externally", delta_color="inverse")
+            
+            ex3, ex4 = st.columns(2)
+            ex3.metric("Marketing (You Pay)", f"₹ {marketing_fee_base:,.2f}", delta="Pay Externally", delta_color="inverse")
+            ex4.metric("Mrkt GST (18%)", f"₹ {marketing_fee_gst:,.2f}", delta="Pay Externally", delta_color="inverse")
+            
+            if myntra_new_brand in ["YK", "YK Disney", "YK Marvel"] and (yk_return_charges > 0 or yk_return_product_cost > 0):
+                ex5, ex6 = st.columns(2)
+                ex5.metric("Return Logistics", f"₹ {yk_return_charges:,.2f}", delta="Deducted", delta_color="inverse")
+                ex6.metric("Return Product Loss", f"₹ {yk_return_product_cost:,.2f}", delta="Deducted", delta_color="inverse")
 
-                st.markdown("---")
-                st.metric("💰 NET PROFIT (In Hand)", f"₹ {net_profit:,.2f}", delta=f"Target: ₹ {product_margin_target_rs:,.2f}")
-
-    else: 
-        st.warning("Locked.")
-        if st.text_input("Password", type="password") == "4255":
-            st.session_state.password_correct = True
-            st.rerun()
+            st.markdown("---")
+            st.metric("💰 NET PROFIT (In Hand)", f"₹ {net_profit:,.2f}", delta=f"Target: ₹ {product_margin_target_rs:,.2f}")
 
 elif main_mode == "Bulk Calculation":
     
